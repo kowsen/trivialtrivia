@@ -47,14 +47,14 @@ module.exports = function(conn) {
 		})
 	}
 
+	function GetTeam(teamId) {
+		return r.table('teams').get(id).run(conn);
+	}
+
 	function CreateQuestion(payload, answer) {
 		return GetMaxQuestionId().then((maxIndex) => {
 			return InsertQuestion(parseInt(maxIndex.id) + 1, payload, answer);
 		});
-	}
-
-	function GetTeam(teamId) {
-		return r.table('teams').get(id).run(conn);
 	}
 
 	function GetNamedTeams() {
