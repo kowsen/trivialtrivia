@@ -1,0 +1,47 @@
+<html>
+<head>
+	<style>
+		input {
+			width: 300px;
+		}
+	</style>
+</head>
+<body>
+	Path: <input type="text" id="path" value=""><br>
+	Body: <input type="text" id="body" value=""><br>
+	Pass: <input type="text" id="pass" value=""><br>
+	<br>
+	<button id="get">GET</button>
+	<button id="post">POST</button>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		$("#get").click(function() {
+			$.ajax({
+				url: $("#path").val(),
+				data: $("#body").val(),
+				type: "GET",
+				// headers: { 'Authorization': btoa($("#pass").val()) }
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('authorization', btoa($("#pass").val()));
+				},
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+			});
+		});
+
+		$("#post").click(function() {
+			$.ajax({
+				url: $("#path").val(),
+				data: $("#body").val(),
+				type: "POST",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('authorization', btoa($("#pass").val()));
+				},
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+			});
+		});
+	</script>
+</body>
+</html>
