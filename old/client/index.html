@@ -1,0 +1,105 @@
+<html>
+<head>
+	<style>
+		#rankings {
+			cursor: pointer;
+			color: blue;
+			text-decoration: underline;
+		}
+	</style>
+</head>
+<body>
+	<p id="question-number"></p>
+	<img id="image">
+	<p id="question"></p>
+
+	<input type="text" id="answer">
+	<button id="submit">Submit</button>
+
+	<p id="guesses"></p>
+	<br>
+
+	<p id="rankings">Rankings</a>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+
+		var host = 'http://localhost:3000';
+		// var host = 'http://45.33.108.249:3000';
+
+		$.urlParam = function(name){
+			var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+			return results[1] || 0;
+		}
+
+		// var teamName = $.urlParam("team");
+		var params = window.location.href.split('/');
+		var teamName = params[params.length - 1];
+
+		$.get(host + '/game/get/info/' + teamName, function(data) {
+			if (data) {
+				if (data.name) {
+					$.get(host + '/game/get/question/' + teamName, function(data) {
+						$('#question-number').html("Question: " + data.id);
+						$('#question').html(data.payload.text);
+						$("#image").attr("src", data.payload.path);
+						$('#guesses').html("Guesses: " + JSON.stringify(data.guesses));
+					});
+				} else {
+					var name = prompt("Enter Team Name:");
+					if (name == null) {
+						$("#submit").hide();
+						$("#answer").hide();
+					}
+					else {
+						post(host + '/game/post/name/' + teamName, JSON.stringify({ name: name }), function(data) {
+							if (!data) {
+								alert('INVALID NAME');
+							}
+							location.reload();
+						});
+					}
+				}
+			}
+			else {
+				$("#submit").hide();
+				$("#answer").hide();
+				alert('Invalid team id: ' + teamName);
+			}
+		});
+
+
+
+		$("#submit").click(submitAnswer);
+		$("#rankings").click(() => {
+			window.location.href = './ranking/' + teamName;
+		});
+
+		$('#answer').keyup(function(e) {
+			if(e.keyCode == 13) {
+		        submitAnswer();
+		    }
+		});
+
+		$("#answer").val('')
+
+		function submitAnswer() {
+			post(host + '/game/post/answer/' + teamName, JSON.stringify({ answer: $("#answer").val() }), function(data) {
+				location.reload();
+			});
+		}
+
+		function post(url, data, cb) {
+			$.ajax({
+				url: url,
+				data: data,
+				type: "POST",
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+		
+	</script>

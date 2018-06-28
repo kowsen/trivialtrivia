@@ -1,0 +1,272 @@
+<html>
+<head>
+	<style>
+		table, th, td {
+   			border: 1px solid black;
+		}
+		th {
+			padding-left: 10px;
+			padding-right: 10px;
+		}
+		.question-table-id {
+			width: 30px;
+		}
+		.question-table-question, .question-table-answer {
+			width: 300px;
+		}
+		.margin-button {
+			margin: 10px;
+			font-size: 1em;
+		}
+		input {
+			/*font-size: 1em;*/
+			padding: 5px;
+			/*font-weight: bold;*/
+		}
+	</style>
+</head>
+<body>
+	<h1>Teams</h1>
+	<table id="teams">
+	  <tr>
+	    <th>id</th>
+	    <th>name</th>
+	    <th>current</th>
+	    <th>delete</th>
+	  </tr>
+	</table>
+	<br>
+	<h2>Add Team</h2>
+	ID: <input type="text" id="team-id">
+	<br>
+	<button id="submit" class="margin-button">Add Team</button>
+
+	<hr>
+
+	<h1>Questions</h1>
+
+	<table id="questions">
+	  <tr>
+	    <th>id</th>
+	    <th>question</th>
+	    <th>answer</th>
+	    <th>update</th>
+	    <th>delete</th>
+	  </tr>
+	</table>
+	<br>
+	<h2>Add Question</h2>
+	<select id="question-type">
+		<option value="none" selected>Type</option>
+		<option value="text">Text</option>
+		<option value="image">Image</option>
+	</select>
+	<div id="text-panel">
+		Question: <input type="text" id="question-question">
+		<br>
+		Answer: <input type="text" id="question-answer">
+		<br>
+		<button id="question-submit" class="margin-button">Add Question</button>
+	</div>
+	<div id="image-panel">
+		Path: <input type="text" id="question-image-path" value="">
+		<br>
+		Text: <input type="text" id="question-image-text" value="">
+		<br>
+		Answer: <input type="text" id="question-image-answer" value="">
+		<br>
+		<button id="question-image-submit">Add Question</button>
+	</div>
+
+	<br>
+	<br>
+
+	<a href="guesses.html"><h2>Guesses</h2></a>
+
+	<br>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		// var host = 'http://45.33.108.249:3000';
+		var host = 'http://localhost:3001';
+		
+		$.urlParam = function(name){
+			var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
+			return results[1] || 0;
+		}
+
+		$.get(host + '/debug/team/list/', function(data) {
+			for (var i = 0; i < data.length; i++) {
+				appendTeam(data[i].id, data[i].name || 'UNINITIALIZED', data[i].current);
+			}
+		});
+
+		$.get(host + '/question/list/', function(data) {
+			for (var i = 0; i < data.length; i++) {
+				appendQuestion(data[i].id, data[i].payload, data[i].answer);
+			}
+		});
+
+		function appendTeam(id, name, current) {
+			$('#teams').append('<tr>\
+	    		<th>' + id + '</th>\
+	    		<th>' + name + '</th>\
+	    		<th>' + current + '</th>\
+	    		<th><button onclick=deleteTeam("' + id + '")>X</button></th>\
+	  		</tr>');
+		}
+
+		function appendQuestion(id, question, answer) {
+			if (question.type == 'text') {
+				$('#questions').append('<tr>\
+		    		<th><input type="text" class="question-table-id" id="question-id-' + id + '" value="' + id + '"></th>\
+		    		<th>Text: <input type="text" class="question-table-question" id="question-question-' + id + '" value="' + question.text + '"></th>\
+		    		<th><input type="text" class="question-table-answer" id="question-answer-' + id + '" value="' + answer + '"></th>\
+		    		<th><button id="question-update-' + id + '">X</button></th>\
+		    		<th><button id="question-delete-' + id + '">X</button></th>\
+		  		</tr>');
+		  		$("#question-update-" + id).click(() => {
+		  			updateQuestion(id, 'text');
+		  		});
+			} else if (question.type == 'image') {
+				$('#questions').append('<tr>\
+		    		<th><input type="text" class="question-table-id" id="question-id-' + id + '" value="' + id + '"></th>\
+		    		<th>Text:<input type="text" class="question-table-question" id="question-question-text-' + id + '" value="' + question.text + '">\
+		    		<br>\
+		    		Path:<input type="text" class="question-table-question" id="question-question-path-' + id + '" value="' + question.path + '"></th>\
+		    		<th><input type="text" class="question-table-answer" id="question-answer-' + id + '" value="' + answer + '"></th>\
+		    		<th><button id="question-update-' + id + '">X</button></th>\
+		    		<th><button id="question-delete-' + id + '">X</button></th>\
+		  		</tr>');
+		  		$("#question-update-" + id).click(() => {
+		  			updateQuestion(id, 'image');
+		  		});
+			}
+			$("#question-delete-" + id).click(() => {
+	  			deleteQuestion(id);
+	  		});
+		}
+
+		function deleteTeam(id) {
+			$.post(host + '/team/destroy/' + id, function() {
+				location.reload();
+			});
+		}
+
+		function deleteQuestion(id) {
+			$.post(host + '/question/destroy/' + id, function() {
+				location.reload();
+			});
+		}
+
+		function updateQuestion(id, type) {
+			// /:id/:newid/:question/:answer
+			if (type == 'text') {
+				var payload = {
+					type: 'text',
+					text: $('#question-question-' + id).val()
+				};
+				$.post(host + '/question/update/' + id + '/' + $('#question-id-' + id).val() + '/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent($('#question-answer-' + id).val()), function() {
+				location.reload();
+				});
+			} else if (type == 'image') {
+				var payload = {
+					type: 'image',
+					text: $("#question-question-text-" + id).val(),
+					path: $('#question-question-path-' + id).val()
+				};
+				$.post(host + '/question/update/' + id + '/' + $('#question-id-' + id).val() + '/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent($('#question-answer-' + id).val()), function() {
+					location.reload();
+				});
+			}
+
+		}
+
+		function createTeam() {
+			var id = $("#team-id").val();
+			if (id != '') {
+				$.post(host + '/team/create/' + $("#team-id").val(), function() {
+					location.reload();
+				});
+			}
+		}
+
+		function createQuestion() {
+			var payload = {
+				type: 'text',
+				text: $("#question-question").val()
+			};
+			var answer = $("#question-answer").val();
+			if (answer != '') {
+			$.post(host + '/question/create/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent(answer), function() {
+					location.reload();
+				});
+			}
+		}
+
+		function createImageQuestion() {
+			var payload = {
+				type: 'image',
+				path: $("#question-image-path").val(),
+				text: $("#question-image-text").val()
+			};
+			var answer = $("#question-image-answer").val();
+			if (answer != '') {
+				$.post(host + '/question/create/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent(answer), function() {
+					location.reload();
+				});
+			}
+		}
+
+		$("#submit").click(createTeam);
+		$("#question-submit").click(createQuestion);
+		$("#question-image-submit").click(createImageQuestion);
+
+		$("#question-type").on('change', function() {
+			if (this.value == "text") {
+				$("#text-panel").show();
+				$("#image-panel").hide();
+			} else if (this.value == "image") {
+				$("#text-panel").hide();
+				$("#image-panel").show();
+			} else {
+				$("#text-panel").hide();
+				$("#image-panel").hide();
+			}
+		});
+
+		$("#text-panel").hide();
+		$("#image-panel").hide();
+
+		$('#team-id').keyup(function(e) {
+			if(e.keyCode == 13) {
+		        createTeam();
+		    }
+		});
+
+		$('#question-answer').keyup(function(e) {
+			if(e.keyCode == 13) {
+		        createQuestion();
+		    }
+		});
+
+		$("#question-image-answer").keyup(function(e) {
+			if (e.keyCode == 13) {
+				createImageQuestion();
+			}
+		});
+
+		$("#team-name").val('');
+		$("#team-id").val('');
+
+		$("#question-id").val('');
+		$("#question-question").val('');
+		$("#question-answer").val('');
+
+		$("#question-image-path").val('');
+		$("#question-image-text").val('');
+		$("#question-image-answer").val('');
+
+		document.getElementById("question-type").selectedIndex = "0";
+		
+	</script>

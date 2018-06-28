@@ -1,0 +1,73 @@
+<html>
+<body>
+	<h1>GUESSES</h1>
+	<p id="guesses"></p>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		// var host = 'http://localhost:3000';
+		var host = 'http://45.33.108.249:3000';
+
+		var params = window.location.href.split('/');
+		var teamName = params[params.length - 1] || 'NONE';
+
+		$.get(host + '/question/list', function(questions) {
+			$.get(host + '/debug/team/list/', function(data) {
+				var isPrintAll = true;
+				for (var i = 0; i < data.length; i++) {
+					if (data[i].id == teamName) {
+						isPrintAll = false;
+						break;
+					}
+				}
+				for (var i = 0; i < data.length; i++) {
+					if (data[i].name && (data[i].id == teamName || isPrintAll)) {
+						GetGuesses(data[i].id, data[i].name, data[i].current, questions);
+					}
+				}
+			});
+		});
+
+
+		function GetGuesses(teamId, teamName, current, questions) {
+			$.get(host + '/guesses/' + teamId, function(data) {
+				data.sort((a, b) => { return a.id[1] - b.id[1]; })
+				$("#guesses").append('<hr>');
+				$("#guesses").append('<h2>' + teamName + '</h2>');
+				for (var i = 0; i < data.length; i++) {
+					$("#guesses").append('<b>' + data[i].id[1] + ': ' + questions[data[i].id[1] - 1].payload.text + '</b>' + DecomposeArray(data[i].guesses, data[i].id[1] < current) + '<br>');
+					$("#guesses").append('<br>');
+				}
+			});
+		}
+
+		function DecomposeArray(arr, isCompleted) {
+			var str = '';
+			for (var i = 0; i < arr.length; i++) {
+				str += '<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;'
+				if (i < arr.length - 1 || !isCompleted) {
+					str += arr[i];
+				}
+				else {
+					str += '<b>' + arr[i] + '</b>';
+				}
+			}
+			return str;
+		}
+
+		// $.get(host + '/team/valid/' + teamName, function(data) {
+		// 	if (data == 'VALID') {
+		// 		$.get(host + '/guesses/' + teamName, function(data) {
+		// 			data.sort((a, b) => { return a.id[1] - b.id[1]; })
+		// 			for (var i = 0; i < data.length; i++) {
+		// 				$("#guesses").append(data[i].id[1] + ': ' + data[i].guesses + '<br>');
+		// 			}
+		// 		});
+		// 	}
+		// 	else {
+		// 		alert('Invalid team id: ' + teamName);
+		// 	}
+		// });
+	</script>
+</body>
+</html>

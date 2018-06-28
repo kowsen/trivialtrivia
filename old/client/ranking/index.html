@@ -1,0 +1,27 @@
+<html>
+<body>
+	<h1>RANKINGS</h1>
+	<p id="ranking"></p>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		// var host = 'http://localhost:3000';
+		var host = 'http://45.33.108.249:3000';
+
+		var params = window.location.href.split('/');
+		var teamName = params[params.length - 1] || 'ranking';
+
+		$.get(host + '/team/list/', function(data) {
+			$.get(host + '/team/get/name/' + teamName, function(teamInfo) {
+				for (var i = 0; i < data.length; i++) {
+					if (data[i].name == teamInfo.name) {
+						$("#ranking").append('<b>--- ' + data[i].name + ' ---</b><br>');
+					} else {
+						$("#ranking").append(data[i].name + '<br>');
+					}
+				}
+			});
+		});
+	</script>
+</body>
+</html>

@@ -1,9 +1,7 @@
-var r = require('rethinkdb');
-
 var DEFAULT_GUESSES = { guesses: [] };
 var MAX_GUESSES = 5;
 var DEFAULT_QUESTION = {
-	id: id,
+	id: 0,
 	payload: {
 		type: 'text',
 		text: 'OUT OF QUESTIONS'
@@ -18,20 +16,30 @@ function RankCompare(a, b) {
 	return b.current - a.current;
 }
 
-module.exports = function(conn) {
+function MatchAnswer(answers, input) {
+	return StripString(input) == StripString(answers);
+}
 
-	function GetTeamQuestion(teamId) {
-		return GetTeam(teamId).then((team) => {
-			return GetQuestion(team.current).then((question) => {
-				return GetGuesses(teamId, team.current, MAX_GUESSES).then((guesses) => {
-					delete question.answer;
-					question.guesses = guesses;
-					return question;
-				});
+function StripString(str) {
+	return str.replace(/[^A-Za-z0-9\s!?]/g,'').split(' ').join('').toLowerCase();
+}
+
+function IsValidName(name) {
+	return name !== 'ranking';
+}
+
+module.exports = function(r, conn) {
+
+	function GetTeamQuestionGame(teamId) {
+		return GetTeamQuestion(teamId).then((question) => {
+			return GetGuesses(teamId, question.id, MAX_GUESSES).then((guesses) => {
+				delete question.answer;
+				question.guesses = guesses;
+				return question;
 			});
 		}).catch(() => {
 			return DEFAULT_QUESTION;
-		})
+		});
 	}
 
 	function GetRanking(teamId) {
@@ -48,7 +56,77 @@ module.exports = function(conn) {
 	}
 
 	function GetTeam(teamId) {
-		return r.table('teams').get(id).run(conn);
+		return r.table('teams').get(teamId).run(conn);
+	}
+
+	function SubmitAnswer(teamId, answer) {
+		return GetTeamQuestion(teamId).then((question) => {
+			if (!question) {
+				return false;
+			}
+			return InsertGuess(teamId, question.id, answer).then(() => {
+				var isCorrect = MatchAnswer(question.answer, answer);
+				if (isCorrect) {
+					return UpdateCurrent(teamId, question.id + 1).then(() => {
+						return true;
+					});
+				} else {
+					return false;
+				}
+			});
+		});
+	}
+
+	function SubmitName(teamId, name) {
+		return IsNameUnique(name).then((isUnique) => {
+			if (isUnique && IsValidName(name)) {
+				return UpdateName(teamId, name).then(() => {
+					return true;
+				});
+			} else {
+				return false;
+			}
+		});
+	}
+
+	function UpdateName(teamId, name) {
+		return r.table('teams').get(teamId).update({
+			name: name
+		}).run(conn);
+	}
+
+	function IsNameUnique(name) {
+		return r.table('teams').filter(r.row('name').eq(name)).isEmpty().run(conn);
+	}
+
+	function UpdateCurrent(teamId, questionIndex) {
+		return r.table('teams').get(teamId).update({current: questionIndex, lastCorrect: new Date()}).run(conn);
+	}
+
+	function CheckAnswer(teamId, answer) {
+		return GetTeamQuestion(teamId).then((question) => {
+			return MatchAnswer(question.answer, answer);
+		});
+	}
+
+	function InsertGuess(teamId, questionIndex, answer) {
+		var guessKey = [teamId, questionIndex];
+		return GetGuesses(teamId, questionIndex, 0).then((guesses) => {
+			guesses.push(answer);
+			return r.table('guesses').get(guessKey).replace({
+				id: guessKey,
+				guesses: guesses
+			}).run(conn);
+		})
+	}
+
+	function GetTeamQuestion(teamId) {
+		return GetTeam(teamId).then((team) => {
+			if (!team) {
+				return false;
+			}
+			return GetQuestion(team.current);
+		});
 	}
 
 	function CreateQuestion(payload, answer) {
@@ -60,6 +138,8 @@ module.exports = function(conn) {
 	function GetNamedTeams() {
 		return r.table('teams').filter((data) => {
 			return data.hasFields('name');
+		}).run(conn).then((cursor) => {
+			return cursor.toArray();
 		});
 	}
 
@@ -68,7 +148,7 @@ module.exports = function(conn) {
 	}
 
 	function GetGuesses(teamId, questionIndex, maxGuesses) {
-		var guessKey = [team.id, team.current];
+		var guessKey = [teamId, questionIndex];
 		return r.table('guesses').get(guessKey).default(DEFAULT_GUESSES).run(conn).then((guessData) => {
 			var guesses = guessData.guesses;
 			if (maxGuesses > 0 && guesses.length > maxGuesses) {
@@ -94,6 +174,12 @@ module.exports = function(conn) {
 		}).run(conn);
 	}
 
-	return {};
+	return {
+		GetTeamQuestionGame,
+		GetRanking,
+		GetTeam,
+		SubmitAnswer,
+		SubmitName
+	};
 
 }

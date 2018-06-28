@@ -11,7 +11,7 @@ app.use(function(req, res, next) {
 });
 
 r.connect({db: 'game'}, function(err, conn) {
-	var db = require('./rethink')(conn);
+	var db = require('./rethink')(r, conn);
 	app.use('/game', require('./game-routes')(db));
 	app.use('/admin', require('./admin-routes')(db));
 
