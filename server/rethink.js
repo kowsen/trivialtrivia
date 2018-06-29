@@ -32,7 +32,7 @@ module.exports = function(r, conn) {
 
 	function GetTeamQuestionGame(teamId) {
 		return GetTeamQuestion(teamId).then((question) => {
-			return GetGuesses(teamId, question.id, MAX_GUESSES).then((guesses) => {
+			return GetGuessesForQuestion(teamId, question.id, MAX_GUESSES).then((guesses) => {
 				delete question.answer;
 				question.guesses = guesses;
 				return question;
@@ -93,7 +93,7 @@ module.exports = function(r, conn) {
 
 	function CreateQuestion(payload, answer) {
 		return GetMaxQuestionId().then((maxIndex) => {
-			return InsertQuestion(parseInt(maxIndex.id) + 1, payload, answer);
+			return InsertQuestion(maxIndex + 1, payload, answer);
 		});
 	}
 
@@ -122,8 +122,7 @@ module.exports = function(r, conn) {
 			return GetQuestion(oldIndex).then((question) => {
 				return DestroyQuestionAndFixOrder(oldIndex).then(() => {
 					return ShiftQuestionsForward(newIndex, r.maxval).then(() => {
-						question.id = newIndex;
-						return InsertQuestion(question);
+						return InsertQuestion(newIndex, question.payload, question.answer);
 					}).then(() => {
 						return true;
 					});
@@ -132,6 +131,58 @@ module.exports = function(r, conn) {
 		});
 	}
 
+	function UpdateQuestion(questionIndex, payload, answer) {
+		return CheckQuestionIndex(questionIndex).then((isValidIndex) => {
+			if (!isValidIndex) {
+				return false;
+			}
+			return r.table('questions').get(questionIndex).update({
+				payload: payload,
+				answer: answer
+			}).run(conn).then(() => {
+				return true;
+			});
+		});
+	}
+
+	function CreateTeam(teamId) {
+		return r.table('teams').get(teamId).run(conn).then((team) => {
+			if (team) {
+				return false;
+			} else {
+				return r.table('teams').insert({
+					id: teamId,
+					current: 1,
+					lastCorrect: new Date()
+				}).run(conn).then(() => {
+					return true;
+				});
+			}
+		})
+
+	}
+
+	function DestroyTeam(teamId) {
+		return r.table('teams').get(teamId).delete({returnChanges: true}).run(conn).then((team) => {
+			return r.table('guesses').filter((guessKey) => {
+				return guessKey('id').contains(teamId);
+			}).delete().run(conn).then((changes) => {
+				return changes != null;
+			});
+		});
+	}
+
+	function GetTeams() {
+		return r.table('teams').orderBy('id').run(conn);
+	}
+
+	function GetGuesses(teamId) {
+		return r.table('guesses').filter((guessKey) => {
+			return guessKey('id').contains(teamId);
+		}).run(conn).then((data) => {
+			return data.toArray();
+		});
+	}
 
 	// -----------------------
 
@@ -161,8 +212,7 @@ module.exports = function(r, conn) {
 		return r.table('questions').between(startIndex, endIndex).orderBy('id').run(conn).then((data) => {
 			return data.eachAsync(function (row, rowFinished) {
 			    DeleteQuestion(row.id).then(() => {
-			    	row.id -= 1;
-			    	InsertQuestion(row).then(() => { rowFinished(); });
+			    	InsertQuestion(row.id - 1, row.payload, row.answer).then(() => { rowFinished(); });
 			    });
 			});
 		});
@@ -172,15 +222,10 @@ module.exports = function(r, conn) {
 		return r.table('questions').between(startIndex, endIndex).orderBy(r.desc('id')).run(conn).then((data) => {
 			return data.eachAsync(function(row, rowFinished) {
 				DeleteQuestion(row.id).then(() => {
-					row.id += 1;
-					InsertQuestion(row).then(() => { rowFinished(); });
+					InsertQuestion(row.id + 1, row.payload, row.answer).then(() => { rowFinished(); });
 				})
 			})
 		});
-	}
-
-	function InsertQuestion(question) {
-		return r.table('questions').insert(question).run(conn);
 	}
 
 	function UpdateName(teamId, name) {
@@ -205,7 +250,7 @@ module.exports = function(r, conn) {
 
 	function InsertGuess(teamId, questionIndex, answer) {
 		var guessKey = [teamId, questionIndex];
-		return GetGuesses(teamId, questionIndex, 0).then((guesses) => {
+		return GetGuessesForQuestion(teamId, questionIndex, 0).then((guesses) => {
 			guesses.push(answer);
 			return r.table('guesses').get(guessKey).replace({
 				id: guessKey,
@@ -235,7 +280,7 @@ module.exports = function(r, conn) {
 		return r.table('questions').get(questionIndex).run(conn);
 	}
 
-	function GetGuesses(teamId, questionIndex, maxGuesses) {
+	function GetGuessesForQuestion(teamId, questionIndex, maxGuesses) {
 		var guessKey = [teamId, questionIndex];
 		return r.table('guesses').get(guessKey).default(DEFAULT_GUESSES).run(conn).then((guessData) => {
 			var guesses = guessData.guesses;
@@ -251,7 +296,9 @@ module.exports = function(r, conn) {
 	}
 
 	function GetMaxQuestionId() {
-		return r.table('questions').max('id').default({id: 0}).run(conn);
+		return r.table('questions').max('id').default({id: 0}).run(conn).then((data) => {
+			return data.id;
+		});
 	}
 
 	function InsertQuestion(id, payload, answer) {
@@ -267,7 +314,16 @@ module.exports = function(r, conn) {
 		GetRanking,
 		GetTeam,
 		SubmitAnswer,
-		SubmitName
+		SubmitName,
+		CreateQuestion,
+		DestroyQuestionAndFixOrder,
+		GetQuestions,
+		MoveQuestion,
+		UpdateQuestion,
+		CreateTeam,
+		DestroyTeam,
+		GetTeams,
+		GetGuesses
 	};
 
 }

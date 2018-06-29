@@ -1,0 +1,38 @@
+<html>
+<body>
+	<h1>RANKINGS</h1>
+	<p id="ranking"></p>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		// var host = 'http://localhost:3000';
+		var host = 'http://45.33.108.249:3000';
+
+		function get(url, data, cb) {
+			$.ajax({
+				url: host + url,
+				data: data,
+				type: "GET",
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+
+		var params = window.location.href.split('/');
+		var teamName = params[params.length - 1] || 'ranking';
+
+		get('/game/get/ranking/' + teamName, null, function(data) {
+			for (var i = 0; i < data.length; i++) {
+				if (data[i].isYou) {
+					$("#ranking").append('<b>--- ' + data[i].name + ' ---</b><br>');
+				} else {
+					$("#ranking").append(data[i].name + '<br>');
+				}
+			}
+		});
+	</script>
+</body>
+</html>

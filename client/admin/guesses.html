@@ -8,11 +8,29 @@
 		// var host = 'http://localhost:3000';
 		var host = 'http://45.33.108.249:3000';
 
+		var password = 'testpass';
+
+		function get(path, body, cb) {
+			$.ajax({
+				url: host + path,
+				data: body,
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('authorization', btoa(password));
+				},
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+
 		var params = window.location.href.split('/');
 		var teamName = params[params.length - 1] || 'NONE';
 
-		$.get(host + '/question/list', function(questions) {
-			$.get(host + '/debug/team/list/', function(data) {
+		get('/admin/question/list', null, function(questions) {
+			get('/admin/team/list/', null, function(data) {
 				var isPrintAll = true;
 				for (var i = 0; i < data.length; i++) {
 					if (data[i].id == teamName) {
@@ -30,7 +48,7 @@
 
 
 		function GetGuesses(teamId, teamName, current, questions) {
-			$.get(host + '/guesses/' + teamId, function(data) {
+			get('/admin/team/guesses/' + teamId, null, function(data) {
 				data.sort((a, b) => { return a.id[1] - b.id[1]; })
 				$("#guesses").append('<hr>');
 				$("#guesses").append('<h2>' + teamName + '</h2>');
@@ -54,20 +72,6 @@
 			}
 			return str;
 		}
-
-		// $.get(host + '/team/valid/' + teamName, function(data) {
-		// 	if (data == 'VALID') {
-		// 		$.get(host + '/guesses/' + teamName, function(data) {
-		// 			data.sort((a, b) => { return a.id[1] - b.id[1]; })
-		// 			for (var i = 0; i < data.length; i++) {
-		// 				$("#guesses").append(data[i].id[1] + ': ' + data[i].guesses + '<br>');
-		// 			}
-		// 		});
-		// 	}
-		// 	else {
-		// 		alert('Invalid team id: ' + teamName);
-		// 	}
-		// });
 	</script>
 </body>
 </html>

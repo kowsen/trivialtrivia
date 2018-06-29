@@ -37,8 +37,6 @@
 	</table>
 	<br>
 	<h2>Add Team</h2>
-	ID: <input type="text" id="team-id">
-	<br>
 	<button id="submit" class="margin-button">Add Team</button>
 
 	<hr>
@@ -87,25 +85,99 @@
 
 	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
 	<script>
-		// var host = 'http://45.33.108.249:3000';
-		var host = 'http://localhost:3001';
-		
-		$.urlParam = function(name){
-			var results = new RegExp('[\?&]' + name + '=([^&#]*)').exec(window.location.href);
-			return results[1] || 0;
+		var host = 'http://45.33.108.249:3000';
+		// var host = 'http://localhost:3000';
+		var password = '';
+
+		function HandleAuth(cb) {
+			var storedPass = sessionStorage.getItem('trivia_pass');
+			if (storedPass) {
+				checkPass(storedPass, function(isValid) {
+					if (isValid) {
+						cb(storedPass);
+					} else {
+						promptPass(function(password) {
+							sessionStorage.setItem('trivia_pass', password);
+							cb(password);
+						});
+					}
+				});
+			} else {
+				promptPass(function(password) {
+					sessionStorage.setItem('trivia_pass', password);
+					cb(password);
+				});
+			}
 		}
 
-		$.get(host + '/debug/team/list/', function(data) {
-			for (var i = 0; i < data.length; i++) {
-				appendTeam(data[i].id, data[i].name || 'UNINITIALIZED', data[i].current);
-			}
-		});
+		function promptPass(cb) {
+			var passwordInput = prompt('password? (currently: "testpass")');
+			checkPass(passwordInput, function(isValid) {
+				if (isValid) {
+					cb(passwordInput);
+				} else {
+					alert('bad password');
+					promptPass(cb);
+				}
+			});
+		}
 
-		$.get(host + '/question/list/', function(data) {
-			for (var i = 0; i < data.length; i++) {
-				appendQuestion(data[i].id, data[i].payload, data[i].answer);
-			}
-		});
+		function checkPass(pass, cb) {
+			password = pass;
+			get('/admin/authcheck', null, function(response) {
+				cb(response && response.success);
+			});
+		}
+
+		function get(path, body, cb) {
+			$.ajax({
+				url: host + path,
+				data: body,
+				type: "GET",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('authorization', btoa(password));
+				},
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+
+		function post(path, body, cb) {
+			$.ajax({
+				url: host + path,
+				data: body,
+				type: "POST",
+				beforeSend: function(xhr){
+					xhr.setRequestHeader('authorization', btoa(password));
+				},
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+
+		function Initialize(pass) {
+			password = pass;
+
+			get('/admin/team/list/', null, function(data) {
+				for (var i = 0; i < data.length; i++) {
+					appendTeam(data[i].id, data[i].name || 'UNINITIALIZED', data[i].current);
+				}
+			});
+
+			get('/admin/question/list/', null, function(data) {
+				for (var i = 0; i < data.length; i++) {
+					appendQuestion(data[i].id, data[i].payload, data[i].answer);
+				}
+			});
+		}
+
+		HandleAuth(Initialize);
 
 		function appendTeam(id, name, current) {
 			$('#teams').append('<tr>\
@@ -148,26 +220,29 @@
 		}
 
 		function deleteTeam(id) {
-			$.post(host + '/team/destroy/' + id, function() {
+			post('/admin/team/destroy/' + id, null, function() {
 				location.reload();
 			});
 		}
 
 		function deleteQuestion(id) {
-			$.post(host + '/question/destroy/' + id, function() {
+			post('/admin/question/destroy/' + id, null, function() {
 				location.reload();
 			});
 		}
 
 		function updateQuestion(id, type) {
-			// /:id/:newid/:question/:answer
 			if (type == 'text') {
 				var payload = {
 					type: 'text',
 					text: $('#question-question-' + id).val()
 				};
-				$.post(host + '/question/update/' + id + '/' + $('#question-id-' + id).val() + '/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent($('#question-answer-' + id).val()), function() {
-				location.reload();
+				var answer = $('#question-answer-' + id).val();
+				post('/admin/question/update/' + id, JSON.stringify({payload, answer}), function() {
+					var newId = parseInt($('#question-id-' + id).val());
+					moveQuestion(id, newId, function() {
+						location.reload();
+					});
 				});
 			} else if (type == 'image') {
 				var payload = {
@@ -175,20 +250,27 @@
 					text: $("#question-question-text-" + id).val(),
 					path: $('#question-question-path-' + id).val()
 				};
-				$.post(host + '/question/update/' + id + '/' + $('#question-id-' + id).val() + '/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent($('#question-answer-' + id).val()), function() {
-					location.reload();
+				var answer = $('#question-answer-' + id).val()
+				post('/admin/question/update/' + id, {payload, answer}, function() {
+					var newId = parseInt($('#question-id-' + id).val());
+					moveQuestion(id, newId, function() {
+						location.reload();
+					});
 				});
 			}
+			
+		}
 
+		function moveQuestion(id, newId, cb) {
+			if (id !== newId) {
+				post('/admin/question/move/' + id, JSON.stringify({ index: newId }), cb);
+			}
 		}
 
 		function createTeam() {
-			var id = $("#team-id").val();
-			if (id != '') {
-				$.post(host + '/team/create/' + $("#team-id").val(), function() {
-					location.reload();
-				});
-			}
+			post('/admin/team/create/', null, function() {
+				location.reload();
+			});
 		}
 
 		function createQuestion() {
@@ -198,7 +280,7 @@
 			};
 			var answer = $("#question-answer").val();
 			if (answer != '') {
-			$.post(host + '/question/create/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent(answer), function() {
+				post('/admin/question/create/', JSON.stringify({payload, answer}), function() {
 					location.reload();
 				});
 			}
@@ -212,7 +294,7 @@
 			};
 			var answer = $("#question-image-answer").val();
 			if (answer != '') {
-				$.post(host + '/question/create/' + encodeURIComponent(JSON.stringify(payload)) + '/' + encodeURIComponent(answer), function() {
+				post('/admin/question/create/', JSON.stringify({payload, answer}), function() {
 					location.reload();
 				});
 			}
@@ -238,12 +320,6 @@
 		$("#text-panel").hide();
 		$("#image-panel").hide();
 
-		$('#team-id').keyup(function(e) {
-			if(e.keyCode == 13) {
-		        createTeam();
-		    }
-		});
-
 		$('#question-answer').keyup(function(e) {
 			if(e.keyCode == 13) {
 		        createQuestion();
@@ -257,7 +333,6 @@
 		});
 
 		$("#team-name").val('');
-		$("#team-id").val('');
 
 		$("#question-id").val('');
 		$("#question-question").val('');
