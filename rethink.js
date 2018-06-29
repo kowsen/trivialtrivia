@@ -89,6 +89,100 @@ module.exports = function(r, conn) {
 		});
 	}
 
+	// -----------------------
+
+	function CreateQuestion(payload, answer) {
+		return GetMaxQuestionId().then((maxIndex) => {
+			return InsertQuestion(parseInt(maxIndex.id) + 1, payload, answer);
+		});
+	}
+
+	function DestroyQuestionAndFixOrder(questionIndex) {
+		return CheckQuestionIndex(questionIndex).then((isValidIndex) => {
+			if (!isValidIndex) {
+				return false;
+			}
+			return DeleteQuestion(questionIndex).then(() => {
+				return ShiftQuestionsBack(questionIndex + 1, r.maxval).then(() => {
+					return true;
+				});
+			});
+		})
+	}
+
+	function GetQuestions() {
+		return r.table('questions').orderBy('id').run(conn);
+	}
+
+	function MoveQuestion(oldIndex, newIndex) {
+		return CheckQuestionIndex([oldIndex, newIndex]).then((isValidIndex) => {
+			if (!isValidIndex) {
+				return false;
+			}
+			return GetQuestion(oldIndex).then((question) => {
+				return DestroyQuestionAndFixOrder(oldIndex).then(() => {
+					return ShiftQuestionsForward(newIndex, r.maxval).then(() => {
+						question.id = newIndex;
+						return InsertQuestion(question);
+					}).then(() => {
+						return true;
+					});
+				});
+			});
+		});
+	}
+
+
+	// -----------------------
+
+
+	function CheckQuestionIndex(questionIndex) {
+		return GetMaxQuestionId().then((maxIndex) => {
+			if (typeof(questionIndex) === 'number') {
+				return questionIndex > 0 && questionIndex <= maxIndex;
+			} else if (typeof(questionIndex) === 'object') {
+				for (var i = 0; i < questionIndex.length; i++) {
+					if (questionIndex[i] < 1 || questionIndex[i] > maxIndex) {
+						return false;
+					}
+				}
+				return true;
+			} else {
+				return false;
+			}
+		});
+	}
+
+	function DeleteQuestion(questionIndex) {
+		return r.table('questions').get(questionIndex).delete().run(conn);
+	}
+
+	function ShiftQuestionsBack(startIndex, endIndex) {
+		return r.table('questions').between(startIndex, endIndex).orderBy('id').run(conn).then((data) => {
+			return data.eachAsync(function (row, rowFinished) {
+			    DeleteQuestion(row.id).then(() => {
+			    	row.id -= 1;
+			    	InsertQuestion(row).then(() => { rowFinished(); });
+			    });
+			});
+		});
+	}
+
+	function ShiftQuestionsForward(startIndex, endIndex) {
+		return r.table('questions').between(startIndex, endIndex).orderBy(r.desc('id')).run(conn).then((data) => {
+			return data.eachAsync(function(row, rowFinished) {
+				DeleteQuestion(row.id).then(() => {
+					row.id += 1;
+					InsertQuestion(row).then(() => { rowFinished(); });
+				})
+			})
+		});
+	}
+
+	function InsertQuestion(question) {
+		return r.table('questions').insert(question).run(conn);
+	}
+
 	function UpdateName(teamId, name) {
 		return r.table('teams').get(teamId).update({
 			name: name
@@ -126,12 +220,6 @@ module.exports = function(r, conn) {
 				return false;
 			}
 			return GetQuestion(team.current);
-		});
-	}
-
-	function CreateQuestion(payload, answer) {
-		return GetMaxQuestionId().then((maxIndex) => {
-			return InsertQuestion(parseInt(maxIndex.id) + 1, payload, answer);
 		});
 	}
 
