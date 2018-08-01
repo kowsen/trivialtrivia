@@ -32,12 +32,13 @@ module.exports = function(r, conn) {
 
 	function GetTeamQuestionGame(teamId) {
 		return GetTeamQuestion(teamId).then((question) => {
-			return GetGuessesForQuestion(teamId, question.id, MAX_GUESSES).then((guesses) => {
+			return GetGuessesToMax(teamId, MAX_GUESSES, question.id).then((guesses) => {
 				delete question.answer;
 				question.guesses = guesses;
 				return question;
 			});
-		}).catch(() => {
+		}).catch((e) => {
+			console.log(e);
 			return DEFAULT_QUESTION;
 		});
 	}
@@ -250,7 +251,7 @@ module.exports = function(r, conn) {
 
 	function InsertGuess(teamId, questionIndex, answer) {
 		var guessKey = [teamId, questionIndex];
-		return GetGuessesForQuestion(teamId, questionIndex, 0).then((guesses) => {
+		return GetGuessesForQuestion(teamId, questionIndex).then((guesses) => {
 			guesses.push(answer);
 			return r.table('guesses').get(guessKey).replace({
 				id: guessKey,
@@ -280,13 +281,10 @@ module.exports = function(r, conn) {
 		return r.table('questions').get(questionIndex).run(conn);
 	}
 
-	function GetGuessesForQuestion(teamId, questionIndex, maxGuesses) {
+	function GetGuessesForQuestion(teamId, questionIndex) {
 		var guessKey = [teamId, questionIndex];
 		return r.table('guesses').get(guessKey).default(DEFAULT_GUESSES).run(conn).then((guessData) => {
 			var guesses = guessData.guesses;
-			if (maxGuesses > 0 && guesses.length > maxGuesses) {
-				guesses = guesses.slice(guesses.length - maxGuesses, guesses.length);
-			}
 			return guesses;
 		});
 	}
@@ -307,6 +305,36 @@ module.exports = function(r, conn) {
 			payload,
 			answer
 		}).run(conn);
+	}
+
+	function GetGuessesToMax(teamId, numGuesses, lastQuestion) {
+		var guesses = [];
+		var question = lastQuestion;
+
+		var GetGuessesIteration = function() {
+			if (guesses.length >= numGuesses) {
+				guesses = guesses.slice(guesses.length - numGuesses, guesses.length);
+				return Promise.resolve(true);
+			} else if (question <= 0) {
+				return Promise.resolve(true);
+			} else {
+				return GetGuessesForQuestion(teamId, question).then((iterationGuesses) => {
+					iterationGuesses = iterationGuesses || [];
+					for (var i = 0; i < iterationGuesses.length; i++) {
+						var index = iterationGuesses.length - i - 1;
+						guesses.unshift({
+							isCorrect: i == 0 && question !== lastQuestion,
+							value: iterationGuesses[index]
+						});
+					}
+					question -= 1;
+					return GetGuessesIteration();
+				});
+			}
+		}
+		return GetGuessesIteration().then(() => {
+			return guesses;
+		});
 	}
 
 	return {

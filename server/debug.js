@@ -1,4 +1,4 @@
-var IS_DEBUG = true;
+var IS_DEBUG = false;
 
 module.exports = {
 	log: function(str) {

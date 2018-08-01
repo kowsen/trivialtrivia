@@ -1,0 +1,219 @@
+<html>
+<head>
+	<style>
+		html, body {
+			min-height: 100%;
+			margin: 0;
+		}
+		html {
+			
+			box-shadow: inset 0vmin 0vmin 10vmin 10vmin #111111;
+		}
+	    body {
+	    	background-color: #111111;
+	    	padding: 0;
+	    	background-image: url('bkg.png');
+        }
+
+        input, button {
+        	font-family: inherit;
+        	font-size: inherit;
+        	font-weight: inherit;
+        	border: inherit;
+        	border-radius: inherit;
+        }
+
+        p {
+			margin: 0;
+		}
+
+		.container {
+			min-width: 500px;
+            width: 90%;
+			margin: auto;
+			max-width: 120vh;
+			display: none;
+		}
+
+		.centered-item {
+			text-align: center;
+		}
+
+		.base-font {
+			font-family: Courier New, Courier, Lucida Sans Typewriter, Lucida Typewriter, monospace;
+			font-weight: bold;
+		}
+
+		.small-margin {
+			margin-bottom: 3vmin;
+		}
+		.large-margin {
+			margin-bottom: 4vmin;
+		}
+
+		.small-text {
+			font-size: 4vmin;
+		}
+		.large-text {
+			font-size: 5vmin;
+		}
+
+		.light-text {
+			color: #EEEEEE;
+		}
+		.dark-text {
+			color: #111111;
+		}
+		.correct-text {
+			color: #2ECC40;
+		}
+		.wrong-text {
+			color: #FF4136;
+		}
+
+		.rounded-border {
+			border: 0px solid;
+			border-radius: 8px;
+		}
+
+		#answer-input {
+			background-color: #EEEEEE;
+			padding: 3vmin;
+			width: 100%;
+		}
+		#submit-button {
+			background-color: #EEEEEE;
+			padding: 2vmin 4vmin 2vmin 4vmin;
+		}
+		#logo-image {
+			width: 50%;
+			margin-top: 2vmin;
+		}
+
+		#question-image {
+			max-width: 50vmin;
+			max-height: 50vmin;
+		}
+
+		#question-image-container {
+			/*display: none;*/
+		}
+	</style>
+</head>
+<body>
+	<div class="container">
+		<div class="centered-item large-margin ">
+			<img id="logo-image" src="logo.png">
+		</div>
+		<div class="base-font light-text large-text large-margin">
+			<p id="question-number-text">Question 11</p>
+		</div>
+		<div class="base-font light-text large-text large-margin">
+			<div id="question-image-container" class="centered-item large-margin">
+				<img id="question-image">
+			</div>
+			<p id="question-text">Who does the thing in the game? It's the thing from that one thing.</p>
+		</div>
+<!-- 		<div class="centered-item base-font wrong-text small-text small-margin">
+			<p id="wrong-notice-text">Wrong answer notice</p>
+		</div> -->
+		<div class="centered-item base-font large-text small-margin rounded-border">
+			<input type="text" id="answer-input" placeholder="Enter answer">
+		</div>
+		<div class="centered-item base-font large-text large-margin rounded-border">
+			<button id="submit-button">Submit</button>
+		</div>
+		<div id="guess-container" class="centered-item base-font small-text large-margin">
+<!-- 			<p class="correct-text">Correct guess</p>
+			<p class="wrong-text">Incorrect guess</p> -->
+		</div>
+	</div>
+
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	<script>
+		var host = 'http://45.33.108.249:3000';
+		// var host = 'http://localhost:3000';
+
+		var params = window.location.href.split('/');
+		var teamName = params[params.length - 1];
+
+		initialize();
+		populate();
+
+		function initialize() {
+			$("#submit-button").click(submitAnswer);
+
+			$('#answer-input').keyup(function(e) {
+				if(e.keyCode == 13) {
+			        submitAnswer();
+			    }
+			});
+
+			$("#answer-input").val('')
+		}
+
+		function populate() {
+			get(host + '/game/get/info/' + teamName, function(data) {
+				if (data) {
+					get(host + '/game/get/question/' + teamName, function(data) {
+						$('#question-number-text').html("Stage " + data.id);
+						$('#question-text').html(data.payload.text);
+
+						if (data.payload.path) {
+							$("#question-image").attr("src", data.payload.path);
+						} else {
+							$("#question-image-container").hide();
+						}
+
+						for (var i = 0; i < data.guesses.length; i++) {
+							var index = data.guesses.length - i - 1;
+							$("#guess-container").append('<p class="' + (data.guesses[index].isCorrect ? 'correct' : 'wrong') + '-text" style="opacity:' + (1 - 0.2 * i) + ';">' + data.guesses[index].value + '</p>')
+						}
+						// $('#guesses').html("Guesses: " + JSON.stringify(data.guesses));
+
+						$(".container").show();
+					});
+				}
+				else {
+					alert('Invalid team id: ' + teamName);
+				}
+			});
+		}
+
+		function getAnswer() {
+			return $("#answer-input").val();
+		}
+
+		function submitAnswer() {
+			post(host + '/game/post/answer/' + teamName, JSON.stringify({ answer: getAnswer() }), function(data) {
+				location.reload();
+			});
+		}
+
+		function post(url, data, cb) {
+			$.ajax({
+				url: url,
+				data: data,
+				type: "POST",
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+
+		function get(url, cb) {
+			$.ajax({
+				url: url,
+				type: "GET",
+				contentType:"application/json; charset=utf-8",
+				dataType:"json",
+				complete: function(data) {
+					cb(data.responseJSON);
+				}
+			});
+		}
+	</script>
+</body>
+</html>
