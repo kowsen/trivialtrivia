@@ -39,6 +39,7 @@ module.exports = function(db) {
 	function PostAnswer(req, res, next) {
 		var teamId = decodeURIComponent(req.params.teamId);
 		var answer = req.body.answer;
+		answer = answer.substring(0, 40);
 		debug.log('post answer: ' + teamId + ', ' + answer);
 		db.SubmitAnswer(teamId, answer).then((isCorrect) => {
 			res.send(isCorrect);

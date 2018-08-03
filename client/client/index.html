@@ -6,7 +6,6 @@
 			margin: 0;
 		}
 		html {
-			
 			box-shadow: inset 0vmin 0vmin 30vmin 10vmin #111111;
 		}
 	    body {
@@ -29,7 +28,7 @@
 
 		.container {
 			min-width: 500px;
-            width: 90%;
+            width: 85%;
 			margin: auto;
 			max-width: 120vh;
 			display: none;
@@ -95,8 +94,34 @@
 			max-height: 50vmin;
 		}
 
-		#question-image-container {
-			/*display: none;*/
+		@media (max-aspect-ratio: 7/5) {
+			html {
+				box-shadow: inset 0vw 0vw 30vw 10vw #111111;
+			}
+
+			.small-margin {
+				margin-bottom: 3vw;
+			}
+			.large-margin {
+				margin-bottom: 5vw;
+			}
+
+			.small-text {
+				font-size: 4vw;
+			}
+			.large-text {
+				font-size: 6vw;
+			}
+
+			#answer-input {
+				padding: 3vw;
+			}
+			#submit-button {
+				padding: 2vw 4vw 2vw 4vw;
+			}
+			#logo-image {
+				margin-top: 2vw;
+			}
 		}
 	</style>
 </head>
@@ -105,7 +130,7 @@
 		<div class="centered-item large-margin ">
 			<img id="logo-image" src="logo.png">
 		</div>
-		<div class="base-font light-text large-text large-margin">
+		<div id="question-number-container" class="base-font light-text large-text large-margin">
 			<p id="question-number-text">Question 11</p>
 		</div>
 		<div class="base-font light-text large-text large-margin">
@@ -117,15 +142,13 @@
 <!-- 		<div class="centered-item base-font wrong-text small-text small-margin">
 			<p id="wrong-notice-text">Wrong answer notice</p>
 		</div> -->
-		<div class="centered-item base-font large-text large-margin rounded-border">
-			<input type="text" id="answer-input" placeholder="Enter answer">
+		<div id="answer-input-container" class="centered-item base-font large-text large-margin rounded-border">
+			<input type="text" id="answer-input" placeholder="Enter answer" maxlength="100">
 		</div>
-		<div class="centered-item base-font large-text large-margin rounded-border">
+		<div id="submit-button-container" class="centered-item base-font large-text large-margin rounded-border">
 			<button id="submit-button">Submit</button>
 		</div>
 		<div id="guess-container" class="centered-item base-font small-text large-margin">
-<!-- 			<p class="correct-text">Correct guess</p>
-			<p class="wrong-text">Incorrect guess</p> -->
 		</div>
 	</div>
 
@@ -170,6 +193,13 @@
 							$("#guess-container").append('<p class="' + (data.guesses[index].isCorrect ? 'correct' : 'wrong') + '-text" style="opacity:' + (1 - 0.2 * i) + ';">' + data.guesses[index].value + '</p>')
 						}
 						// $('#guesses').html("Guesses: " + JSON.stringify(data.guesses));
+
+						if (data.payload.isPrompt) {
+							$("#question-number-container").hide();
+							$("#guess-container").hide();
+
+							$("#answer-input").attr("placeholder", "Enter message");
+						}
 
 						$(".container").show();
 					});

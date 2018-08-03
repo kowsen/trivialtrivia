@@ -17,7 +17,7 @@ function RankCompare(a, b) {
 }
 
 function MatchAnswer(answers, input) {
-	return StripString(input) == StripString(answers);
+	return StripString(input).includes(StripString(answers));
 }
 
 function StripString(str) {
